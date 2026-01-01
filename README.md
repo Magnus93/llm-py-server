@@ -31,4 +31,14 @@ sudo docker run -d \
 `ghcr.io/open-webui/open-webui:main` - The Docker image to run (latest Open WebUI release)
 
 
+Switch to this to use the py-server as proxy.
+```bash
+sudo docker run -d \
+  --network host \
+  -v open-webui:/app/backend/data \
+  -e OLLAMA_BASE_URL=http://127.0.0.1:8000 \
+  --name open-webui \
+  ghcr.io/open-webui/open-webui:main
+```
+
 After this, Open WebUI will be accessible at `http://localhost:8080`
