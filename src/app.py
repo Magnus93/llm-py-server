@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import requests
 
@@ -16,6 +17,9 @@ conversation = [
 class ChatRequest(BaseModel):
     user_message: str
 
+@app.get("/chat")
+def list_chat():
+    return conversation
 
 @app.post("/chat")
 def chat(req: ChatRequest): 
@@ -25,20 +29,21 @@ def chat(req: ChatRequest):
     payload = {
         "model": MODEL,
         "messages": conversation,
-        "stream": False
+        "stream": True
     }
 
-    r = requests.post(f"{OLLAMA_URL}/api/chat", json=payload)
-    print("r.text:", r.text)
-    data = r.json()
-    print(data)
-
-    assistant_msg = data["message"]
-    conversation.append(assistant_msg)
-
-    return assistant_msg
+    return StreamingResponse(
+        stream_ollama(payload),
+        media_type="application/json"
+    )
 
 
-@app.get("/chat")
-def list_chat():
-    return conversation
+def stream_ollama(payload):
+    with requests.post(
+        f"{OLLAMA_URL}/api/chat",
+        json=payload,
+        stream=True
+    ) as r:
+        for line in r.iter_lines():
+            if line:
+                yield line + b"\n"
