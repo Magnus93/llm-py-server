@@ -29,3 +29,6 @@ sudo docker run -d \
 `-e OLLAMA_BASE_URL=http://127.0.0.1:11434` - Tell Open WebUI where to find your local Ollama API
 `--name open-webui` - Give the container a human-readable name for easier management (`docker stop open-webui`, `docker logs open-webui`, etc.)
 `ghcr.io/open-webui/open-webui:main` - The Docker image to run (latest Open WebUI release)
+
+
+After this, Open WebUI will be accessible at `http://localhost:8080`
