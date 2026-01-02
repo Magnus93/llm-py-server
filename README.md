@@ -1,4 +1,10 @@
 
+## Installing dependencies
+```bash
+pip install -r requirements.txt
+```
+
+
 ## Running Open WebUI
 
 ### Stopping and removing the old container
