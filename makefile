@@ -1,6 +1,6 @@
 
 serve:
-	. .venv/bin/activate && uvicorn src.app:app --reload
+	. .venv/bin/activate && uvicorn src.main:app --reload
 
 install:
 	pip install --upgrade pip
