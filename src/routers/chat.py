@@ -3,21 +3,27 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Literal, Union, List
 from src.core import config
-from src.services import brave_search
+from src.services.brave_search import brave_search
 import requests
 import json
 
 
-system_message = {
-    "role": "system",
-    "content": '''
-You have access to a web search tool.
-If you need information from the web, respond ONLY in JSON format like: 
-{"action": "search", "query": "<what to search>"}
-Do NOT output any other text outside this JSON.
-'''
-}
-
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "web_search",
+            "description": "Search the web for current information, recent events or facts that may have changed",
+            "parameters": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                    "query": {"type": "string","description": "The search query"}
+                }
+            }
+        }
+    }
+]
 class ContentParts(BaseModel):
     text: str
     type: str
@@ -31,6 +37,10 @@ class ChatRequest(BaseModel):
     model: str
     messages: List[MessageRequest]
 
+class ToolCall(Exception):
+    def __init__(self, call):
+        print("ToolCall", f"{call}")
+        self.call = call
 
 
 def stream_ollama(payload):
@@ -41,23 +51,26 @@ def stream_ollama(payload):
     ) as r:
         buffer = ""
         for line in r.iter_lines():
-            print("line:\t", line)
-            if line:
-                chunk = line.decode("utf-8")
-                buffer += chunk
+            if not line:
+                continue
 
-                try:
-                    data = json.loads(buffer)
-                    if  "action" in data and data["action"] == "search":
-                        query = data["query"]
-                        search_results = brave_search(query)
-                        yield ({"tool": "search", "query": query, "results": search_results}).encode("utf-8") + "b\n"
-                        buffer=""
-                    else:
-                        yield chunk.encode("utf-8") + b"\n"
-                        buffer = ""
-                except json.JSONDecodeError:
-                    yield chunk.encode("utf-8") + b"\n"
+            chunk = line.decode("utf-8")
+            buffer += chunk
+
+            try:
+                data = json.loads(buffer)
+                buffer = ""
+                tool_calls = data.get("message", {}).get("tool_calls")
+
+                if tool_calls:
+                    raise ToolCall(tool_calls[0])
+                    
+                yield chunk.encode("utf-8") + b"\n"
+                buffer = ""
+
+            except json.JSONDecodeError:
+                # Partial JSON, keep buffering
+                continue
 
 
 router = APIRouter(prefix="/api")
@@ -66,11 +79,30 @@ router = APIRouter(prefix="/api")
 async def chat(req: ChatRequest): 
     print("user_message", req.messages[len(req.messages) - 1].content)
     payload = req.model_dump()
-    payload["messages"].append(system_message)
+    payload["tools"] = TOOLS
 
     print("payload:\n", payload)
 
+    def generator():
+        try:
+            yield from stream_ollama(payload)
+
+        except ToolCall as tc:
+            query = tc.call["function"]["arguments"]["query"]
+            tool_id = tc.call["id"]
+
+            print("brave_search with query:", "f{query}")
+            results = brave_search(query)
+
+            payload["messages"].append({
+                "role": "tool",
+                "tool_call_id": tool_id,
+                "content": json.dumps(results)
+            })
+
+            yield from stream_ollama(payload)
+
     return StreamingResponse(
-        stream_ollama(payload),
+        generator(),
         media_type="application/json"
     )
