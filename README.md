@@ -48,3 +48,12 @@ sudo docker run -d \
 ```
 
 After this, Open WebUI will be accessible at `http://localhost:8080`
+
+### .env
+Add `.env` file:
+```ini
+OLLAMA_BASE_URL=<URL and PORT where ollama model is hosted>
+
+BRAVE_BASE_URL="https://api.search.brave.com"
+BRAVE_API_KEY=<Valid Brave API Key>
+```
